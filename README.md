@@ -26,7 +26,7 @@ Node.js 22+ a PostgreSQL (včetně Supabase). Na Renderu použijte web service:
 - Proměnné prostředí: `NODE_ENV=production`, `DATABASE_URL`, `DATABASE_SSL=true`, `SETUP_TOKEN`.
 - Volitelně `APP_URL` jako přesný veřejný origin bez koncového lomítka.
 
-Databázové přihlašovací údaje patří jen do tajných proměnných prostředí. Žádný databázový klíč, heslo ani připojovací řetězec se neposílá do prohlížeče. Pro Supabase preferujte session pooler. Připojení ověřuje TLS certifikát.
+Databázové přihlašovací údaje patří jen do tajných proměnných prostředí. Žádný databázový klíč, heslo ani připojovací řetězec se neposílá do prohlížeče. Pro Supabase preferujte session pooler. Připojení ověřuje TLS certifikát. Oficiální veřejný kořenový certifikát Supabase je v `certs/supabase-ca.crt`; jeho důvěra doplňuje systémové CA a ověřování se nevypíná. Pro vlastní autoritu lze nastavit `DATABASE_CA_FILE`.
 
 `SETUP_TOKEN` musí být náhodný řetězec s alespoň 32 znaky. První administrátor se vytvoří pouze pomocí odkazu `https://VAŠE-APLIKACE/#setup=JEDNORÁZOVÝ-TOKEN`. Token se z URL odstraní před načtením aplikace a po vytvoření admina ho už nelze znovu použít. Admin má uživatelské jméno `admin` a zvolí si vlastní heslo. Další účty vytváří administrátor. Hesla musí mít minimálně 12 znaků.
 
