@@ -30,7 +30,7 @@ Databázové přihlašovací údaje patří jen do tajných proměnných prostř
 
 `SETUP_TOKEN` musí být náhodný řetězec s alespoň 32 znaky. První administrátor se vytvoří pouze pomocí odkazu `https://VAŠE-APLIKACE/#setup=JEDNORÁZOVÝ-TOKEN`. Token se z URL odstraní před načtením aplikace a po vytvoření admina ho už nelze znovu použít. Admin má uživatelské jméno `admin` a zvolí si vlastní heslo. Další účty vytváří administrátor. Hesla musí mít minimálně 12 znaků.
 
-První start transakčně připraví izolované schéma `perso`; existující tabulky ostatních aplikací se nemění. Data jsou uložená na PostgreSQL serveru. Konfigurace a denní záznamy se aktualizují v transakci se zámkem a kontrolou revize; souběžný zápis vyžádá obnovení místo přepsání cizích změn. Audit má samostatnou tabulku. V UI se zobrazuje posledních 2 000 událostí, starší zůstávají v databázi. Provoz je určený pro jednu restauraci (nejvýše 1 000 zaměstnanců a 50 000 denních záznamů); při velkém objemu je vhodná stránkovaná evidence namísto načítání celého provozu.
+První start transakčně připraví izolované schéma `perso`; existující tabulky ostatních aplikací se nemění. Data jsou uložená na PostgreSQL serveru. Konfigurace a denní záznamy se aktualizují v transakci se zámkem a kontrolou revize; souběžný zápis vyžádá obnovení místo přepsání cizích změn. Audit má samostatnou tabulku. V UI se zobrazuje posledních 2 000 událostí, starší zůstávají v databázi. Každý provoz má oddělený stav (nejvýše 1 000 zaměstnanců a 50 000 denních záznamů na provoz); při velkém objemu je vhodná stránkovaná evidence namísto načítání celého provozu.
 
 Zajistěte zálohování databáze podle plánu Supabase. Bezplatný Render může po nečinnosti uspávat službu; data zůstávají v externí databázi.
 
@@ -50,3 +50,24 @@ node test/browser.mjs
 ```
 
 Testy používají skutečný PostgreSQL engine ve WebAssembly (PGlite), ne vzdálenou provozní databázi. Ověřují výpočty, ceny, role, odmítnutí podvržených dat, transakční audit, zamknuté úhrady, hesla, ochranu proti cizímu původu, souběžné verze i přetrvání dat po opětovném přihlášení. Prohlížečové ověření používá Playwright a lokální Chromium. Na běžném vývojovém zařízení lze upravit `executablePath` v `test/browser.mjs`.
+
+## Více provozů a majitelé
+
+Hlavní administrátor (`admin`, role `superadmin`) má stránku **Provozy**. Pouze on vytváří nové provozy, vydává nebo obnovuje přístup majitele a pozastavuje provoz. U vytvoření dostane jednorázově náhodné dočasné jméno a heslo; lze je zkopírovat nebo stáhnout. Heslo se ukládá pouze jako scrypt hash. Platnost dočasného přístupu je 72 hodin.
+
+Majitel se přihlásí dočasnými údaji a před přístupem k datům musí zvolit **nové uživatelské jméno i nové heslo**. Server odmítá všechny obchodní operace, dokud není aktivace dokončená. Aktivace zruší dočasné přihlášení i všechny starší sessions. Uživatelská jména jsou globálně jedinečná; heslo má 12–128 znaků.
+
+Majitel spravuje zaměstnance a jejich oprávnění, jídelníček, ceny, směny, obaly, zápisy, úhrady, měsíční přehledy a audit výhradně svého provozu. Nemůže vytvářet další provozy, měnit role majitelů ani přistupovat k cizím účtům a datům. Server odvozuje provoz od přihlášeného účtu. Hlavička `X-Perso-Venue` umožňuje hlavnímu administrátorovi zvolit provoz; ostatním rolím nemůže změnit rozsah přístupu.
+
+Tabulky `venues` a `venue_states` doplňují existující schéma. Původní evidence zůstává v původní tabulce `state` bez kopírování nebo přepisu. Existujícímu administrátorovi se doplní role `superadmin` a zaměstnancům původní provoz. Přihlášení, hesla, záznamy a audit zůstávají zachované. Nové záznamy auditu mají vždy identifikátor provozu. Pozastavení provozu ruší přihlášení majitele a zaměstnanců; data nemaže. Obnovení dočasného přístupu majitele ruší jeho dosavadní heslo i sessions a znovu vyžaduje vlastní přihlášení.
+
+Rozšířené kontroly:
+
+```sh
+npm run check
+npm test
+node test/browser.mjs
+node test/venues-browser.mjs
+```
+
+API testy navíc pokrývají zákaz přístupu mezi dvěma provozy, pokus o přepsání hesla cizího zaměstnance, povinnou aktivaci, expiraci, konflikt jména, obnovu majitele, pozastavení, ochranu auditu a skutečný upgrade ze starého schématu. Prohlížečové testy vytvářejí dvě restaurace, oba majitele aktivují, ověřují jejich správu a oddělení dat, stahování údajů, obnovení přístupu a mobilní zobrazení. Testy běží výhradně na lokálních databázích, ne nad zákaznickými daty.

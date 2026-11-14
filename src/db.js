@@ -1,4 +1,5 @@
 import pg from 'pg';
+import {tenantMigration,LEGACY_VENUE} from './tenancy.js';
 import {readFileSync} from 'node:fs';
 import {rootCertificates} from 'node:tls';
 export function createPool(){if(!process.env.DATABASE_URL)throw new Error('DATABASE_URL není nastaveno.');const url=new URL(process.env.DATABASE_URL);for(const key of ['sslmode','sslcert','sslkey','sslrootcert'])url.searchParams.delete(key);const supabase=/\.supabase\.(com|co)$/.test(url.hostname);const ca=process.env.DATABASE_CA_FILE?readFileSync(process.env.DATABASE_CA_FILE,'utf8'):supabase?readFileSync(new URL('../certs/supabase-ca.crt',import.meta.url),'utf8'):null;return new pg.Pool({connectionString:url.toString(),max:5,idleTimeoutMillis:30000,connectionTimeoutMillis:10000,...(process.env.DATABASE_SSL==='false'?{}:{ssl:{rejectUnauthorized:true,...(ca?{ca:[...rootCertificates,ca]}:{})}})});}
@@ -20,6 +21,6 @@ REVOKE ALL ON SCHEMA perso FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA perso FROM PUBLIC;
 CREATE OR REPLACE FUNCTION perso.immutable_audit() RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$ BEGIN RAISE EXCEPTION 'Audit history is append only'; END; $$;
 DROP TRIGGER IF EXISTS perso_audit_immutable ON perso.audit;
-CREATE TRIGGER perso_audit_immutable BEFORE UPDATE OR DELETE ON perso.audit FOR EACH ROW EXECUTE FUNCTION perso.immutable_audit();`);await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
+CREATE TRIGGER perso_audit_immutable BEFORE UPDATE OR DELETE ON perso.audit FOR EACH ROW EXECUTE FUNCTION perso.immutable_audit();`);await c.query(tenantMigration);await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
 export async function transaction(pool,fn){const c=await pool.connect();try{await c.query('BEGIN');const r=await fn(c);await c.query('COMMIT');return r;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
-export async function writeAudit(c,l){await c.query('INSERT INTO perso.audit(id,at,actor_id,actor,action,target,before_value,after_value) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[l.id,l.at,l.actorId,l.actor,l.action,l.target,l.before||'',l.after||'']);}
+export async function writeAudit(c,l){await c.query('INSERT INTO perso.audit(id,at,actor_id,actor,action,target,before_value,after_value,venue_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[l.id,l.at,l.actorId,l.actor,l.action,l.target,l.before||'',l.after||'',l.venueId||LEGACY_VENUE]);}
